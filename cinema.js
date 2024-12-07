@@ -59,6 +59,10 @@ function hideNavigation() {
         .next().css("visibility", "hidden")
 }
 
+function like() {
+    getVisibleItems().get(current).find('button[data-testid="likeBtn"]').click()
+}
+
 function reset() {
     window.location.reload();
 }
@@ -68,10 +72,14 @@ $(document).on('keydown', function(event) {
     return;
   }
   switch (event.key) {
+    case 'l':
+      like();
+      break;
     case 'Escape':
       reset();
       break;
     case 'i':
+    case 'c':
     case 'ArrowDown':
       getVisibleItems().get(current).click();
       break;
@@ -102,11 +110,11 @@ body.append(
     $(`
 <div 
     id="cinema-welcome" 
-    style="background:#3f77fb; color:#eee; font-size:12px; border-radius:10px; padding:10px; position:fixed; bottom:0; left:10px; z-index:100000;"
+    style="background:#0085ff; color:#eee; font-size:12px; border-radius:10px; padding:10px; position:fixed; bottom:0; left:10px; z-index:100000;"
 >
-    <div style="font-size:16px; font-weight:bold; margin-bottom:10px;">
-    🍿 Bluesky Cinema<br>
-    </div>
+    <center style="font-size:16px; font-weight:bold; margin-bottom:10px;">
+    Bluesky 🍿 Cinema<br>
+    </center>
     <table style="border:1px solid #eee">
         <tr>
             <td> Next</td>
@@ -117,16 +125,20 @@ body.append(
             <td> ${character('k')} or ${character('ArrowLeft')}</td>
         </tr>
         <tr>
+            <td>Like</td>
+            <td> ${character('l')}</td>
+        </tr>
+        <tr>
             <td> Comments</td>
-            <td> ${character('i')} or ${character('ArrowUp')}</td>
+            <td> ${character('i')} or ${character('c')} or ${character('ArrowUp')}</td>
         </tr>
         <tr>
             <td>Reset</td>
             <td> ${character('Escape')}</td>
         </tr>
     </table>
-    <center style="font-size:10px; color:#bbb; margin-top:10px;">
-        <a href=https://github.com/laffra/bsky-cinema/cinema.js>github.com/laffra/bsky-cnma</a>
+    <center style="font-size:10px; color:#f8fd1f; margin-top:10px;">
+        <a href=https://github.com/laffra/bsky-cnma/blob/main/cinema.js>source code</a>
     </center>
 </div>
     `)
