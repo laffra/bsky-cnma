@@ -38,59 +38,130 @@ function showAllItems() {
     }
 }
 
-function highlight(item) {
+function getPostURL(item) {
+    for (link of item.find("a")) {
+        if (link.href.includes("/post/")) {
+            return link.href.replace("https://bsky.app/profile/", "");
+        }
+    }
+    return "";
+}
+
+function getContentURL(item) {
+    for (link of item.find("a")) {
+        if (!link.href.includes("/bsky.app/profile/")) {
+            console.log("bsky-cnma: Found link", link.href);
+            return link.href;
+        }
+    }
+    return "#";
+}
+
+function getReadKey(item) {
+    return `cnma-${getPostURL(item)}`;
+}
+
+function alreadyRead(item) {
     try {
-        $('#cinema-welcome').css("opacity", 0);
-        $('button[aria-label="Back"]').click()
-        $('button[aria-label="New post"]').css("display", "none");
-        $('button[aria-label="Load new posts"]').css("display", "none");
-        item.css({
-            width: "85vw",
-            maxWidth: 1024,
-            background: root.css("--background"),
-            zIndex: 100000,
-            opacity: 1,
-            overflow: "hidden",
-            paddingTop: 10,
-            paddingRight: 50,
-            height: "100vh",
-        })
-        item.css({
-            marginLeft: -item.offset().left + (body.width() - item.width()) / 2 + 15
-        })
-        if (!item.offset()) return;
-        
-        $(document).scrollTop(item.offset().top - 3)
+        return localStorage.getItem(getReadKey(item)) !== null;
     } catch (e) {
-        console.log("bsky-cnma: Cannot highlight", item, e);
+        console.log("bsky-cnma: Cannot mark check if item was already read", item, e);
     }
 }
 
-function unhighlight() {
+function markAsRead(item) {
     try {
-        $('button[aria-label="Load new posts"]').css("display", "block");
-        $('button[aria-label="New post"]').css("display", "block");
-        getVisibleItems().each(function (index, element) {
-            $(element).css({
-                width: "100%",
-                opacity: 1,
-                padding: 0,
-                margin: 0,
-                height: "100%",
-            })
-        });
+        localStorage.setItem(getReadKey(item), new Date().getTime() / 1000);
     } catch (e) {
-        console.log("bsky-cnma: Cannot unhighlight", e);
+        console.log("bsky-cnma: Cannot mark item as read", item, e);
+    }
+}
+
+function cleanupLocalStorage() {
+    const now = new Date().getTime() / 1000;
+    const expirationSeconds = 60 * 60 * 24; // one day
+    for (let key of Object.keys(localStorage)) {
+        if (key.startsWith("cnma-")) {
+            const when = parseFloat(localStorage.getItem(key));
+            if (now - when > expirationSeconds) {
+                localStorage.removeItem(key);
+            }
+        }
+    }
+}
+
+function highlight(item) {
+    console.log("Highlight:", alreadyRead(item), getPostURL(item));
+    $('#cinema-welcome').css("opacity", 0);
+    $('button[aria-label="Back"]').click()
+    $('button[aria-label="New post"]').css("display", "none");
+    $('button[aria-label="Load new posts"]').css("display", "none");
+    item.css({
+        width: "85vw",
+        maxWidth: 1024,
+        background: root.css("--background"),
+        zIndex: 100000,
+        opacity: 1,
+        overflow: "hidden",
+        paddingTop: 10,
+        paddingRight: 50,
+        height: "100vh",
+    })
+    item.css({
+        marginLeft: -item.offset().left + (body.width() - item.width()) / 2 + 15
+    })
+    markAsRead(item);
+    showPreview(getContentURL(item));
+    $(document).scrollTop(item.offset().top - 3)
+}
+
+function unhighlight() {
+    $('button[aria-label="Load new posts"]').css("display", "block");
+    $('button[aria-label="New post"]').css("display", "block");
+    getVisibleItems().each(function (index, element) {
+        $(element).css({
+            width: "100%",
+            opacity: 1,
+            padding: 0,
+            margin: 0,
+            height: "100%",
+        })
+    });
+}
+
+function showPreview(url) {
+    try {
+        console.log("bsky-cnma: Showing preview", url);
+        (async () => {
+            await chrome.runtime.sendMessage({preview: url});
+        })();
+    } catch (e) {
+        console.log("bsky-cnma: Cannot preview", url, e);
     }
 }
 
 function showCurrent() {
     try {
+        showPreview("");
         hideAllItems();
         hideNavigation()
         highlight(getVisibleItems().get(current));
     } catch (e) {
         console.log("bsky-cnma: Cannot show current", current, e);
+        setTimeout(showCurrent, 1000); // try again on newly loaded posts
+    }
+}
+
+function showNextUnread() {
+    try {
+        item = getVisibleItems().get(++current);
+        if (alreadyRead(item)) {
+            setTimeout(showNextUnread, 1);
+        }
+        showCurrent();
+    } catch (e) {
+        console.log("bsky-cnma: Cannot show next unread", current, e);
+        setTimeout(showCurrent, 1000); // try again on newly loaded posts
     }
 }
 
@@ -109,6 +180,7 @@ function reset() {
     showAllItems();
     showNavigation();
     unhighlight();
+    current = -1;
 }
 
 function showNavigation() {
@@ -157,8 +229,7 @@ function handleKeydown(event) {
             break;
         case 'j':
         case 'ArrowRight':
-            current++;
-            showCurrent()
+            showNextUnread()
             break;
         case 'k':
         case 'ArrowLeft':
@@ -219,11 +290,13 @@ body.append(
 $(document).on('keydown', handleKeydown);
 
 setTimeout(() => {
-    $('#cinema-welcome').animate({"opacity": 1});
+    $('#cinema-welcome').animate({"opacity": 1}, 2000);
 }, 1000);
 setTimeout(() => {
-    $('#cinema-welcome').animate({"opacity": 0});
+    $('#cinema-welcome').animate({"opacity": 0}, 1000);
 }, 5000);
+
+cleanupLocalStorage();
 
 console.log(
     "Bluesky Cinema Extension Activated:",
